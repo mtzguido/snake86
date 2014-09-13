@@ -1,0 +1,116 @@
+Snake para 8086.
+
+- Instrucciones para compilar:
+ Se debe tener el compilador bcc (Bruce's C compiler) instalado. No se puede
+ usar el gcc, ya que actualmente no tiene soporte para arquitecturas de x86
+ de 16 bits.
+
+ Usamos solo instrucciones de 16 bit para mantener compatibilidad hasta
+ el 8086. Cualquier procesador x86 en una pc IBM-compatible deberia correr
+ bien este programa. Ademas, las interrupciones de BIOS que se usaron estan
+ bastante estandarizadas.
+
+ En la carpeta con los fuentes, basta correr "make" para generar una imagen
+ booteable del juego "boot.img". Si se desea guardar en algun medio se puede
+ usar "dd if=boot.img of=/dev/x" donde x es el device que se desea grabar
+ (esto arruinará el sistema de archivos, asi que tener cuidado). Si se
+ cambia la variable DISKID en Makefile, se puede ejecutar "make burn" para
+ hacerlo automaticamente.
+
+- Proceso de compilado y bootstrap
+
+ El Makefile compila automaticamente el bootloader y el codigo del juego.
+ Además, coteja que los tamaños de cada binario esten dentro de los limites.
+ El bootloader debe ser menor a 510 bytes (un sector menos 2 bytes de magia:
+ 0x55aa). El tamaño del juego está solo acotado por la memoria disponible y
+ el disco de donde se esté corriendo, pero se debe tener alguna cota superior
+ para poder cargarlo todo en memoria. El bootloader carga 20 sectores (10kbyte)
+ a memoria, por lo tanto el Makefile chequea que el code.bin no exceda los 10k.
+
+- Archivos fuente y generados:
+	boot.s: Prepara los segmentos y carga el resto del código a memoria,
+	luego salta al inicio, que es etiqueta "main" de code.s.
+
+	boot.o: objeto compilado de boot.s
+
+	boot.bin: Linkeado y sin headers.
+
+	code.s: Contiene el punto de entrada del juego y varias funciones
+	que cumplen el rol de primitivas para poder programar en C. Son,
+	en en general, wrappers a las interrupciones de BIOS.
+
+	lib.c: Algunas funciones auxiliares extra, escritas en C.
+
+	game.c: La logica del juego. Hace uso de las funciones de code.s
+	y lib.c.
+
+	lib.c: lib.c compilado, sin ".data".
+
+	game.s: game.c compilado, sin ".data".
+
+	code.bin: El codigo maquina generado por game.c, lib.c y code.s, sin
+	headers.  Aqui se salta cuando el bootloader termina su preparacion.
+	Es cargado en la dirección 0x70000 (0x7000:0x0000)
+
+	boot.img: Archivo creado de unir boot.bin y code.bin. boot.bin se
+	encuentra en (a lo sumo) los primeros 510 bytes, y code.bin desde
+	el byte 512 en adelante. Esta disposicion es la que espera el
+	bootloader. Esto puede ser grabado en un disco.
+
+- Misc
+
+ Al compilador le pasamos el flag "-x", para que no linkee con crt0.o,
+que lleva a cabo la inicialización de la libreria estándar de C, y hace
+que el código generado no sea booteable.
+
+ Algo a notar es que no hay separación entre el stack, text y data
+segment, de hecho, en boot.s, los registros de segmentos ds, ss y cs
+se setean al mismo valor (0x7000). Esto se debe a dos cosas:
+  1 - El stack crece de memoria alta a baja, por lo que deberia crecer
+     mucho para que la stack colisione con el texto. Esto no puede darse
+     en este caso particular ya que no hay tantas variables locales ni
+     recursión. Se podría haber elegido otro segmento, pero no es
+     necesario.
+  2 - La salida del compilador es pasada por sed para quitarle las
+     directivas ".data", para que las variables estáticas queden en el
+     segmento de texto, efectivamente mezclando ambos. Esto tiene la
+     consecuencia de que necesitamos tener cs y ds iguales durante toda
+     la ejecución.
+
+ Este truco de llevar el data segment al text segment tiene una
+consecuencia: No puede haber variables estaticas sin inicializacion,
+ya que el compilador usar una directiva ".comm" que reserva espacio
+en el data segment. Se podría haber hecho un comando que cambie las
+directivas ".comm" por tantas ".byte 0" como sean necesarias, pero
+no vale la pena, es más fácil evitar las variables estáticas sin
+inicializacion. Seguramente hay forma de separar ambos segmentos
+y cargarlos en distintas direcciones de memoria, pero para un programa
+asi de simple no es necesario.
+
+ Al linker (ld86) se le pasa el flag "-d", para que genere código
+binario sin ningún header, que es lo que necesitamos ya que no hay
+ningun SO que tenga que cargar el código. Simplemente se salta a él.
+
+ Notar que al compilador *no* le decimos que no linkee con su libreria
+estándar. Esto ocurre por dos motivos:
+  1 - Por mas que no haya una llamada explicita a una funcion, el bcc
+     puede generar codigo que llame a su libreria estandar. Un ejemplo
+     es para manejar la multiplicacion de longs, donde llama a lmull.
+  2 - Mientras no usemos ninguna funcion, no hay problema en dejarla.
+     En main.c hay una variable llamada wait, y el compilador nos
+     advierte que esta opacando a wait() de la libreria estandar, pero
+     de nuevo, no hay problema.
+
+- Controles:
+ Movimiento: WASD
+ Volver a jugar: Espacio
+ Cambiar velocidad: +, -
+
+- Biblio:
+
+http://wiki.osdev.org/Main_Page
+http://mikeos.berlios.de/write-your-own-os.html
+http://susam.in/articles/boot-sector-code/
+http://joelgompert.com/OS/TableOfContents.htm
+http://www.ctyme.com/intr/int.htm
+
