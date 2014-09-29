@@ -11,9 +11,9 @@ int cantbonus = 2;
 int wait = 1;
 
 /*
-st = 0, normal
-st = 1, aca se comio algo
-*/
+ * st = 0, normal
+ * st = 1, aca se comio algo
+ */
 
 unsigned int snakelen = 0; /* max 100 */
 unsigned int snakeoffset = 0; /* 0 <= snakeoffset < snakelen, marca el head */
@@ -146,7 +146,7 @@ int bonus;
 			          0);
 		break;
 	case 1:
-		score = score*2;
+		score = score * 11 / 10;
 		break;
 	}
 }
@@ -267,6 +267,16 @@ int movesnake()
 	return 1;
 }
 
+int randbonus()
+{
+	int x = myrand() % 100;
+
+	if (x < 5)
+		return 0; /* Shorten */
+	else
+		return 1; /* 10% score */
+}
+
 void mainloop()
 {
 	int k,prevk,clock;
@@ -280,7 +290,7 @@ void mainloop()
 	while(1) {
 		clock = gettime();
 		if(myrand() % 23 == 0 && bonust == -1)
-			bonust = myrand() % cantbonus;
+			bonust = randbonus();
 
 		while((k = readkey()) != (-1))
 			prevk=k;
