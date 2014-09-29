@@ -1,0 +1,9 @@
+*.bin
+*.o
+boot.img
+game.s
+game.s.temp
+lib.s
+lib.s.temp
+tags
+.*.swp
