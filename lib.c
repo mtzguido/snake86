@@ -52,7 +52,8 @@ int x;
 static long s = 34534;
 int myrand()
 {
-	return (s=s*23523+12311)&0xff;
+	s = s * 23523 + 12311;
+	return (s % 7919) & 0xff;
 }
 
 int printlong(n, attr, minlen)
