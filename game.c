@@ -60,20 +60,25 @@ int rot;
 			       );
 }
 
-void drawframe()
+void drawframe(idle)
+int idle;
 {
 	int i;
 
 	if(score > hiscore)
 		hiscore = score;
 
-	printstr("SC ", xy(0,0), COL_WHITE);
-	printlong(score, COL_WHITE, 8);
+	if (!idle) {
+		printstr("SC ", xy(0,0), COL_WHITE);
+		printlong(score, COL_WHITE, 8);
 
-	printstr("GSNAKE", xy(16,0), COL_WHITE);
+		printstr("SNAKE86", xy(16,0), COL_WHITE);
+	} else {
+		printstr("APRIETA UNA TECLA", xy(0,0), COL_WHITE);
+	}
 
 	printstr("HI ", xy(29,0), COL_GREY);
-	printlong(hiscore, COL_GREY, 8);	
+	printlong(hiscore, COL_GREY, 8);
 
 	for(i=10; i<PIX_H; ++i)
 	{
@@ -85,8 +90,6 @@ void drawframe()
 		drawpix(i,9,1);
 		drawpix(i,199,1);
 	}
-	
-
 }
 
 void drawblock(x,y,col)
@@ -151,7 +154,8 @@ int bonus;
 	}
 }
 
-void drawscreen()
+void drawscreen(idle)
+int idle;
 {
 	unsigned int i, rot;
 	int dx,dy;
@@ -192,7 +196,7 @@ void drawscreen()
 		drawtile(bonusx, bonusy, bonusg[bonust], 0);
 
 	drawtile(applex, appley, apple, 0);
-	drawframe();
+	drawframe(idle);
 }
 
 void lost()
@@ -243,7 +247,6 @@ int movesnake()
 	   snakearr[newoff].y == 0 ||
 	   snakearr[newoff].y == TILE_H ||
 	   !freepos(snakearr[newoff].x,snakearr[newoff].y)) {
-		lost();
 		return 0;
 	} else {
 		snakeoffset = newoff;
@@ -275,6 +278,25 @@ int randbonus()
 		return 0; /* Shorten */
 	else
 		return 1; /* 10% score */
+}
+
+void lost_screen() {
+	int i, j, clock;
+	int dir;
+
+	for(i = 0; i < PIX_W; ++i)
+		for(j = 0; j < PIX_H; j++)
+			drawpix(i, j, 0);
+
+	while (readkey() != ' ') {
+		while (!movesnake())
+			snakedir = myrand() % 4;
+
+		drawscreen(1);
+		clock = gettime();
+		while(gettime() <= clock + 1)
+			;
+	}
 }
 
 void mainloop()
@@ -311,11 +333,12 @@ void mainloop()
 
 		if(movesnake() == 0)
 		{
-			dir=0; startup();
-			for(i=0; i<PIX_W; ++i) for(j=0; j<PIX_H; j++) drawpix(i,j,0);
+			dir = 0; startup();
+			lost();
+			lost_screen();
 			continue;
 		} else {
-			drawscreen();
+			drawscreen(0);
 			while(gettime() <= clock + wait)
 				;
 		}

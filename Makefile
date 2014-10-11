@@ -1,7 +1,7 @@
 .PHONY: all clean test burn re
 SHELL=/bin/bash
 VMNAME=dfgdf
-DISKID=usb-SanDisk_Cruzer_200435130202B6738688-0:0
+DISKID=usb-Kingston_DataTraveler_2.0_0019E06B9C85ED30F75300C6-0:0
 width=80
 
 all: boot.img
