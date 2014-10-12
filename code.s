@@ -14,6 +14,8 @@ export _drawpix
 export _setvideo
 export _readkey
 export _gettime
+export _relax
+export _resetvideo
 
 ; Imprime un caracter en la posicion del cursor
 ; void printchar(char c, char attr)
@@ -200,6 +202,17 @@ _setvideo:
 	int	#0x10
 	ret
 
+; Setea el modo de video a cualquier verdura
+; y despues hace setvideo(). Dibuja la pantalla de negro
+; void setvideo()
+
+_resetvideo:
+	mov	ah, #0x00
+	mov	al, #0x00
+	int	#0x10
+	call _setvideo
+	ret
+
 
 ; Similar a getchar
 ; inv readkey()
@@ -221,4 +234,10 @@ _gettime:
 	mov	ah, #0x00
 	int	#0x1a
 	mov	ax, dx
+	ret
+
+; No quememos el CPU!
+_relax:
+	rep
+	nop
 	ret

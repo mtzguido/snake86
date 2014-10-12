@@ -19,6 +19,18 @@ unsigned int snakelen = 0; /* max 100 */
 unsigned int snakeoffset = 0; /* 0 <= snakeoffset < snakelen, marca el head */
 int snakedir = 0;
 
+#define error() error_f(__LINE__)
+void error_f(line)
+int line;
+{
+	printstr("ERR", xy(0,0), COL_WHITE);
+	setcur(xy(3,0));
+	printlong((long)line, COL_WHITE, 8);
+
+	while (1)
+		relax();
+}
+
 void drawtile(x,y,img,rot)
 int x;
 int y;
@@ -64,6 +76,7 @@ void drawframe(idle)
 int idle;
 {
 	int i;
+	int col_hi;
 
 	if(score > hiscore)
 		hiscore = score;
@@ -74,11 +87,17 @@ int idle;
 
 		printstr("SNAKE86", xy(16,0), COL_WHITE);
 	} else {
-		printstr("APRIETA UNA TECLA", xy(0,0), COL_WHITE);
+		/* 40 chars to clear whole row */
+		printstr("APRIETA ESPACIO             ",
+				xy(0,0), COL_WHITE);
 	}
 
-	printstr("HI ", xy(29,0), COL_GREY);
-	printlong(hiscore, COL_GREY, 8);
+	if (score >= hiscore)
+		col_hi = COL_WHITE;
+	else
+		col_hi = COL_GREY;
+	printstr("HI ", xy(29,0), col_hi);
+	printlong(hiscore, col_hi, 8);
 
 	for(i=10; i<PIX_H; ++i)
 	{
@@ -202,16 +221,29 @@ int idle;
 void lost()
 {
 	int i,j;
-	for(i=5; i<TILE_W-5; ++i)
-		for(j=5; j<TILE_H-5; ++j)
-			drawblock(i,j,0);
+	for(i = 5; i < TILE_W - 5; ++i)
+		for(j = 5; j < TILE_H - 5; ++j)
+			drawblock(i, j, 0);
 
-	printstr("PERDISTE!", xy(15, 12), 4);
-	printstr("TU PUNTAJE: ", xy(10, 13), 0xf);
-	setcur(xy(22,13)); printlong(score, 0x0f, 0);
-	
+	for(i = 4; i < TILE_W - 4; ++i) {
+		drawblock(i, 4, 1);
+		drawblock(i, TILE_H - 5, 1);
+	}
+
+	for(j = 4; j < TILE_H - 4; ++j) {
+		drawblock(4, j, 1);
+		drawblock(TILE_W - 5, j, 1);
+	}
+
+	printstr("PERDISTE!", xy(16, 8), 4);
+	printstr("TU PUNTAJE: ", xy(10, 12), 0xf);
+	setcur(xy(22, 12)); printlong(score, 0x0f, 0);
+
+	printstr("APRIETA ESPACIO", xy(12, 15), 0xf);
+	printstr("PARA CONTINUAR",  xy(12, 16), 0xf);
+
 	while(readkey() != ' ')
-		;
+		relax();
 }
 
 int freepos(x,y)
@@ -280,69 +312,155 @@ int randbonus()
 		return 1; /* 10% score */
 }
 
-void lost_screen() {
-	int i, j, clock;
+int manh(x1, y1, x2, y2)
+int x1, y1, x2, y2;
+{
+	return myabs(x1 - x2) + myabs(y1 - y2);
+}
+
+void apply_dir(x1, y1, dir, x2, y2)
+int x1, y1, dir;
+int *x2;
+int *y2;
+{
+	*x2 = x1;
+	*y2 = y1;
+	switch(dir) {
+	case EAST:	(*x2)++; break;
+	case SOUTH:	(*y2)++; break;
+	case WEST:	(*x2)--; break;
+	case NORTH:	(*y2)--; break;
+	default: error();
+	}
+
+}
+
+int idle_search() {
+	int cost[TILE_W][TILE_H];
+	int dir[TILE_W][TILE_H];
+	int i, j;
+	int d = 999;
+	int ret = -1;
+
+	int tx, ty; /* target */
+	int cx, cy; /* current pos */
+
+	if (bonust != -1) {
+		tx = bonusx;
+		ty = bonusy;
+	} else {
+		tx = applex;
+		ty = appley;
+	}
+
+	cx = snakearr[snakeoffset % 100].x;
+	cy = snakearr[snakeoffset % 100].y;
+
+	for (i = 0; i < 4; i++) {
+		int zx, zy;
+		apply_dir(cx, cy, i, &zx, &zy);
+
+		if (manh(cx, cy, zx, zy) != 1)
+			error();
+
+		if (!freepos(zx, zy))
+			continue;
+
+		if (manh(zx, zy, tx, ty) < d) {
+			d = manh(zx, zy, tx, ty);
+			ret = i;
+		}
+	}
+
+	if (ret == -1)
+		error();
+
+	return ret;
+}
+
+int lost_idle() {
+	int clock;
 	int dir;
 
-	for(i = 0; i < PIX_W; ++i)
-		for(j = 0; j < PIX_H; j++)
-			drawpix(i, j, 0);
-
 	while (readkey() != ' ') {
-		while (!movesnake())
-			snakedir = myrand() % 4;
+		if(myrand() % 35 == 0 && bonust == -1)
+			bonust = randbonus();
+
+		dir = idle_search();
+		snakedir = dir;
+
+		if (!movesnake())
+			return 1;
 
 		drawscreen(1);
 		clock = gettime();
-		while(gettime() <= clock + 1)
-			;
+		while(gettime() <= clock + wait)
+			relax();
+	}
+
+	return 0;
+}
+
+void play_loop() {
+	int k,prevk,clock;
+	int dir;
+	int i,j;
+
+	while (1) {
+		clock = gettime();
+		if(myrand() % 35 == 0 && bonust == -1)
+			bonust = randbonus();
+
+		/*
+		 * Flush all key reads and use only
+		 * the latest one
+		 */
+		while ((k = readkey()) != -1)
+			prevk = k;
+
+		switch (prevk) {
+			case 'w': dir=3; break;
+			case 'a': dir=2; break;
+			case 's': dir=1; break;
+			case 'd': dir=0; break;
+			case '-': wait++; dir=-1; break;
+			case '+': wait--; if (wait<0) wait=0; dir=-1; break;
+			default:  dir=-1; break;
+		}
+
+		/* Prevent 180° turn */
+		if(dir != -1 && ((dir-snakedir)&1))
+			snakedir = dir;
+
+		if (movesnake() == 0) {
+			/* Lost */
+			return;
+		} else {
+			drawscreen(0);
+			while(gettime() <= clock + wait)
+				relax();
+		}
 	}
 }
 
 void mainloop()
 {
-	int k,prevk,clock;
-	int dir;
-	int i,j;
-
 	selftest();
 	setvideo();
-	startup();
 
-	while(1) {
-		clock = gettime();
-		if(myrand() % 23 == 0 && bonust == -1)
-			bonust = randbonus();
+	while (1) {
+		startup();
+		resetvideo();
+		play_loop();
 
-		while((k = readkey()) != (-1))
-			prevk=k;
+		lost();
 
-		switch(prevk) {
-		case 'w': dir=3; break;
-		case 'a': dir=2; break;
-		case 's': dir=1; break;
-		case 'd': dir=0; break;
-		case '-': wait++; dir=-1; break;
-		case '+': wait--; if (wait<0) wait=0; dir=-1; break;
-		default:  dir=-1; break;
-		}
-
-		/* previene giro de 180º */
-		if(dir != -1 && ((dir-snakedir)&1))
-			snakedir=dir;
-
-		if(movesnake() == 0)
-		{
-			dir = 0; startup();
-			lost();
-			lost_screen();
-			continue;
-		} else {
-			drawscreen(0);
-			while(gettime() <= clock + wait)
-				;
+		while (1) {
+			startup();
+			resetvideo();
+			if (!lost_idle())
+				break;
 		}
 	}
-
 }
 
