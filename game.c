@@ -366,14 +366,19 @@ int idle_search() {
 		if (!freepos(zx, zy))
 			continue;
 
+		if (zx < 0 || zx >= TILE_W ||
+			zy < 1 || zy >= TILE_H)
+			continue;
+
 		if (manh(zx, zy, tx, ty) < d) {
 			d = manh(zx, zy, tx, ty);
 			ret = i;
 		}
 	}
 
+	/* Die */
 	if (ret == -1)
-		error();
+		ret = 0;
 
 	return ret;
 }
