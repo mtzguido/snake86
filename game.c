@@ -9,6 +9,7 @@ int applex = 0; appley = 0;
 int bonusx = 0, bonusy = 0, bonust = -1;
 int cantbonus = 2;
 int wait = 1;
+int playing;
 
 /*
  * st = 0, normal
@@ -78,7 +79,7 @@ int idle;
 	int i;
 	int col_hi;
 
-	if(score > hiscore)
+	if(playing && score > hiscore)
 		hiscore = score;
 
 	if (!idle) {
@@ -92,7 +93,7 @@ int idle;
 				xy(0,0), COL_WHITE);
 	}
 
-	if (score >= hiscore)
+	if (score >= hiscore && playing)
 		col_hi = COL_WHITE;
 	else
 		col_hi = COL_GREY;
@@ -188,6 +189,14 @@ int idle;
 		dy = (snakearr[(i+snakeoffset+1)%100].y - snakearr[(i+snakeoffset+99)%100].y);
 
 		if(i>0 && i< snakelen-1) {
+			/*
+			 * We only care about the first position
+			 * after the head, all others are already
+			 * drawn. Fix this to remove this crappy loop
+			 */
+			if (i != 1)
+				continue;
+
 			if(dx&1)  { /* giro */
 				cw = (dx1 > 0 && dy > 0) || (dy1 > 0 && dx < 0) || (dx1 < 0 && dy < 0) || (dy1 < 0 && dx > 0);
 				rot = 2*(dx<0) + (dx == dy);
@@ -456,10 +465,12 @@ void mainloop()
 	while (1) {
 		startup();
 		resetvideo();
+		playing = 1;
 		play_loop();
 
 		lost();
 
+		playing = 0;
 		while (1) {
 			startup();
 			resetvideo();
